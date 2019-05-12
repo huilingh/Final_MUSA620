@@ -120,10 +120,11 @@ app.layout = html.Div(
 )
 
 
-@app.callback(
-    [Output("map", "srcDoc"), Output("yearSliderValue", "children"), Output("monthSliderValue", "children")],
-    [Input("yearSlider", "value"), Input("monthSlider", "value")]
-)
+@app.callback([
+    Output("map", "srcDoc"),
+    Output("yearSliderValue", "children"),
+    Output("monthSliderValue", "children")
+], [Input("yearSlider", "value"), Input("monthSlider", "value")])
 
 def render(year, month):
     # filter data

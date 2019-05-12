@@ -1,7 +1,7 @@
 certifi
 chardet
 click
-dash
+dash==0.39.0
 dash-core-components
 dash-html-components
 dash-renderer
