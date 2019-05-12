@@ -1,6 +1,7 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+from dash.dependencies import Output, Input
 import pandas as pd
 import folium
 from folium.plugins import HeatMap
@@ -120,10 +121,8 @@ app.layout = html.Div(
 
 
 @app.callback(
-    [dash.dependencies.Output("map", "srcDoc"),
-    dash.dependencies.Output("yearSliderValue", "children"),
-    dash.dependencies.Output("monthSliderValue", "children")],
-    [dash.dependencies.Input("yearSlider", "value"), dash.dependencies.Input("monthSlider", "value")]
+    [Output("map", "srcDoc"), Output("yearSliderValue", "children"), Output("monthSliderValue", "children")],
+    [Input("yearSlider", "value"), Input("monthSlider", "value")]
 )
 
 def render(year, month):
