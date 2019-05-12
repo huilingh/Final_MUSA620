@@ -100,8 +100,7 @@ app.layout = html.Div(
 
 
 @app.callback(
-    [dash.dependencies.Output("map", "srcDoc"),
-    dash.dependencies.Output("monthSliderValue", "children")],
+    [dash.dependencies.Output("monthSliderValue", "children"), dash.dependencies.Output("map", "srcDoc")],
     [dash.dependencies.Input("monthSlider", "value")]
 )
 
