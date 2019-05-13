@@ -1,20 +1,10 @@
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-from dash.dependencies import Output, Input
+from flask import Flask, request, render_template
 import pandas as pd
+import altair as alt
 import folium
-from folium.plugins import HeatMap
-
 
 # initialize the app
-app = dash.Dash(__name__)
-
-# add external styling
-app.css.append_css({"external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"})
-
-# set a title
-app.title = "Beijing Housing Price"
+app = Flask(__name__)
 
 
 # read the data
@@ -22,120 +12,190 @@ read = pd.read_csv("BJ_houseprice_prediction.csv", engine='python')
 # filter dates in 2011-2017
 filtered = read.loc[(read['year']>2010) & (read['year']<2018)]
 
-# filter the dataset
-def filter_data(data, year, month):
-    subset = data.loc[(data['year']==year) & (data['month']==month)]
-    return subset
+# price (sq m)
+# average home price per year and per month (price per square meter)
+ave_price = filtered.groupby(['year', 'month'])['price'].mean().round().reset_index()
+ave_price['date'] = pd.to_datetime(ave_price[['year', 'month']].assign(Day=1))
+# average home price per year and per month and per district
+price_dist = filtered.groupby(['year', 'month', 'district_name'])['price'].mean().round().reset_index()
+price_dist['date'] = pd.to_datetime(price_dist[['year', 'month']].assign(Day=1))
+
+# total price
+# average total price per year and per month
+ave_totalprice = filtered.groupby(['year', 'month'])['totalPrice'].mean().round().reset_index()
+ave_totalprice['date'] = pd.to_datetime(ave_totalprice[['year', 'month']].assign(Day=1))
+# average total price per year and per month and per district
+totalprice_dist = filtered.groupby(['year', 'month', 'district_name'])['totalPrice'].mean().round().reset_index()
+totalprice_dist['date'] = pd.to_datetime(price_dist[['year', 'month']].assign(Day=1))
 
 
 
-def get_folium_map(data):
-    # initialize the Folium map
-    m = folium.Map(location=[39.919775,116.365913], tiles='cartodbpositron', zoom_start=11)
-    locationlist = list(zip(data['Lat_transed'], data['Lng_transed']))
+def altair1(mydata):
+    # basic line
+    line = alt.Chart().mark_line().encode(
+        x='date:T', y='price:Q',
+        tooltip=[alt.Tooltip('price:Q', title='Price/m²'), alt.Tooltip('date:T', timeUnit='yearmonth', title='Date')]).properties(width=400)
 
-    # add heat map
-    HeatMap(locationlist).add_to(m)
+    # add interactive line tooltips
+    # Create a selection that chooses the nearest point & selects based on x-value
+    nearest = alt.selection(type='single', nearest=True, on='mouseover',
+                            fields=['date'], empty='none')
 
-    # # define popup content
-    # def popup(price, year, month):
-    #     content = "Price: " + str(price) + "\nYear: " + str(year) + "\nMonth: " + str(month)
-    #     return content
-    # # define color by price
-    # def color(price):
-    #     if (price < 40000): return '#38f5e8'
-    #     elif (price >=40000) & (price < 60000): return '#5fd4da'
-    #     elif (price >= 60000) & (price <80000): return '#87b4cb'
-    #     elif (price >= 80000) & (price <100000): return '#ae93bd'
-    #     else: return '#d572af'
-    #
-    # for p in range(0, len(locationlist)):
-    #     price = data['price'].iloc[p]
-    #     year = data['year'].iloc[p]
-    #     month = data['month'].iloc[p]
-    #     folium.CircleMarker(
-    #         locationlist[p],
-    #         radius=3,
-    #         popup=popup(price, year, month),
-    #         color=color(price),
-    #         fill=True,
-    #         fill_opacity=0.6).add_to(m)
+    # Transparent selectors across the chart. This is what tells us the x-value of the cursor
+    selectors = alt.Chart().mark_point().encode(
+        x='date:T',
+        opacity=alt.value(0),
+    ).add_selection(nearest)
 
-    return m.get_root().render()
+    # Draw points on the line, and highlight based on selection
+    points = line.mark_point().encode(
+        opacity=alt.condition(nearest, alt.value(1), alt.value(0))
+    )
+
+    # Draw a rule at the location of the selection
+    rules = alt.Chart().mark_rule(color='gray').encode(
+        x='date:T',
+    ).transform_filter(nearest)
+
+    # Put the layers into a chart and bind the data
+    line_price = alt.layer(line, selectors, points, rules, data=mydata)
+    return line_price
 
 
-markdown_text = """
-# Visualizing Beijing Housing Price
-"""
+def altair2(mydata):
+    # basic line
+    line = alt.Chart().mark_line().encode(
+        x='date:T', y='price:Q', color='district_name:N',
+        tooltip=[alt.Tooltip('price:Q', title='Price/m²'),
+                 alt.Tooltip('date:T', timeUnit='yearmonth', title='Date'),
+                 alt.Tooltip('district_name:N', title="District")]).properties(width=400)
 
-# set the layout
-app.layout = html.Div(
-    [
-        # the title!
-        dcc.Markdown(markdown_text),
-        # DIV ELEMENT FOR YEAR SLIDER
-        html.Div(
-            [
-                html.Label("Select the number of year to query"),
-                dcc.Slider(id="yearSlider", min=2011, max=2017, value=2017),
-                html.P(id="yearSliderValue", children=""),
-            ],
-            style={
-                "width": "250px",
-                "margin-right": "auto",
-                "margin-left": "auto",
-                "text-align": "center",
-            },
-        ),
+    # add interactive line tooltips: https://altair-viz.github.io/gallery/multiline_tooltip.html
+    # Create a selection that chooses the nearest point & selects based on x-value
+    nearest = alt.selection(type='single', nearest=True, on='mouseover',
+                            fields=['date'], empty='none')
 
-        # DIV ELEMENT FOR MONTH SLIDER
-        html.Div(
-            [
-                html.Label("Select the number of month to query"),
-                dcc.Slider(id="monthSlider", min=1, max=12, value=12),
-                html.P(id="monthSliderValue", children=""),
-            ],
-            style={
-                "width": "250px",
-                "margin-right": "auto",
-                "margin-left": "auto",
-                "text-align": "center",
-            },
-        ),
+    # Transparent selectors across the chart. This is what tells us the x-value of the cursor
+    selectors = alt.Chart().mark_point().encode(
+        x='date:T',
+        opacity=alt.value(0)
+    ).add_selection(
+        nearest
+    )
 
-        # MAP IFRAME
-        html.Div(
-            [
-                html.Iframe(
-                    id="map",
-                    height="500",
-                    width="800",
-                    sandbox="allow-scripts",
-                    style={"border-width": "0px", "align": "center"},
-                )
-            ],
-            style={"display": "flex", "justify-content": "center"},
-        ),
-    ]
-)
+    # Draw points on the line, and highlight based on selection
+    points = line.mark_point().encode(
+        opacity=alt.condition(nearest, alt.value(1), alt.value(0))
+    )
+
+    # Draw a rule at the location of the selection
+    rules = alt.Chart().mark_rule(color='gray').encode(
+        x='date:T',
+    ).transform_filter(
+        nearest
+    )
+
+    # Put the layers into a chart and bind the data
+    line_price_dist = alt.layer(line, selectors, points, rules, data=mydata)
+    return line_price_dist
 
 
-@app.callback([
-    Output("map", "srcDoc"),
-    Output("yearSliderValue", "children"),
-    Output("monthSliderValue", "children")
-], [Input("yearSlider", "value"), Input("monthSlider", "value")])
+def altair3(mydata):
+    # basic line
+    line = alt.Chart().mark_line().encode(
+        x='date:T', y='totalPrice:Q',
+        tooltip=[alt.Tooltip('totalPrice:Q', title='Total Price (million)'), alt.Tooltip('date:T', timeUnit='yearmonth', title='Date')]).properties(width=400)
 
-def render(year, month):
-    # filter data
-    data = filter_data(filtered, year, month)
-    # make and return our map
-    map = get_folium_map(data)
-    year_text = "Year = %d" % year
-    month_text = "Month = %d" % month
-    return map, year_text, month_text
+    # add interactive line tooltips: https://altair-viz.github.io/gallery/multiline_tooltip.html
+    # Create a selection that chooses the nearest point & selects based on x-value
+    nearest = alt.selection(type='single', nearest=True, on='mouseover',
+                            fields=['date'], empty='none')
 
+    # Transparent selectors across the chart. This is what tells us the x-value of the cursor
+    selectors = alt.Chart().mark_point().encode(
+        x='date:T',
+        opacity=alt.value(0),
+    ).add_selection(
+        nearest
+    )
+
+    # Draw points on the line, and highlight based on selection
+    points = line.mark_point().encode(
+        opacity=alt.condition(nearest, alt.value(1), alt.value(0))
+    )
+
+    # Draw a rule at the location of the selection
+    rules = alt.Chart().mark_rule(color='gray').encode(
+        x='date:T',
+    ).transform_filter(
+        nearest
+    )
+
+    # Put the layers into a chart and bind the data
+    line_totalprice = alt.layer(line, selectors, points, rules, data=mydata)
+    return line_totalprice
+
+
+def altair4(mydata):
+    # basic line
+    line = alt.Chart().mark_line().encode(
+        x='date:T', y='totalPrice:Q', color='district_name:N',
+        tooltip=[alt.Tooltip('totalPrice:Q', title='Total Price (million)'),
+                 alt.Tooltip('date:T', timeUnit='yearmonth', title='Date'),
+                 alt.Tooltip('district_name:N', title="District")]).properties(width=400)
+
+    # add interactive line tooltips: https://altair-viz.github.io/gallery/multiline_tooltip.html
+    # Create a selection that chooses the nearest point & selects based on x-value
+    nearest = alt.selection(type='single', nearest=True, on='mouseover',
+                            fields=['date'], empty='none')
+
+    # Transparent selectors across the chart. This is what tells us the x-value of the cursor
+    selectors = alt.Chart().mark_point().encode(
+        x='date:T',
+        opacity=alt.value(0),
+    ).add_selection(
+        nearest
+    )
+
+    # Draw points on the line, and highlight based on selection
+    points = line.mark_point().encode(
+        opacity=alt.condition(nearest, alt.value(1), alt.value(0))
+    )
+
+    # Draw a rule at the location of the selection
+    rules = alt.Chart().mark_rule(color='gray').encode(
+        x='date:T',
+    ).transform_filter(
+        nearest
+    )
+
+    # Put the layers into a chart and bind the data
+    line_totalprice_dist = alt.layer(line, selectors, points, rules, data=mydata)
+    return line_totalprice_dist
+
+
+def hconcat(chart1, chart2):
+    return alt.hconcat(chart1, chart2)
+
+
+
+@app.route('/')
+def index():
+    return render_template("template.html")
+
+@app.route('/altair-price')
+def chart_1():
+    chart1 = altair1(ave_price)
+    chart2 = altair2(price_dist)
+    combined1 = hconcat(chart1, chart2)
+    return combined1.to_json()
+
+@app.route('/altair-totalprice')
+def chart_2():
+    chart3 = altair3(ave_totalprice)
+    chart4 = altair4(totalprice_dist)
+    combined2 = hconcat(chart3, chart4)
+    return combined2.to_json()
 
 if __name__ == "__main__":
-    render(2017,12)
-    app.run_server(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

@@ -1,15 +1,11 @@
 certifi
 chardet
 click
-dash==0.39.0
-dash-core-components
-dash-html-components
-dash-renderer
 decorator
 django
+flask
 Flask
 Flask-Compress
-folium
 gunicorn
 idna
 ipython-genutils

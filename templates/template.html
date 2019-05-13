@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Flask App</title>
+    <meta charset="utf-8" />
+
+    <!--load vega -->
+    <script src="https://cdn.jsdelivr.net/npm//vega@3.3.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm//vega-lite@2.4.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm//vega-embed@3.11"></script>
+
+    <style>
+      body { text-align: center; }
+    </style>
+
+  </head>
+
+  <body>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+
+    <h1>Beijing Housing Price</h1>
+    <p>This web page displays the monthly average prices (sq m) and total prices in Beijing from 2011 to 2017.</p>
+    <br>
+
+    <!-- the div elements to embed the charts -->
+    <h3>Price (sq m)</h3>
+    <div id="price"></div>
+    <br><br>
+    <h3>Total Price</h3>
+    <div id="totalprice"></div>
+
+
+    <script type="text/javascript">
+      // embed price (sq m)
+      em_opt = {"actions": false};
+
+      url1 = "/altair-price";
+      vegaEmbed("#price", url1, em_opt).then(function(result) {}).catch(console.error);
+      url2 = "/altair-totalprice";
+      vegaEmbed("#totalprice", url2, em_opt).then(function(result) {}).catch(console.error);
+
+    </script>
+
+  </body>
+</html>
