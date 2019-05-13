@@ -1,7 +1,6 @@
 from flask import Flask, request, render_template
 import pandas as pd
 import altair as alt
-import folium
 
 # initialize the app
 app = Flask(__name__)
